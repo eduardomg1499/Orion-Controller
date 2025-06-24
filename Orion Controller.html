@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orion Controller | N.I.N.A.</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+
+    <style>
+        :root {
+            --bg: #0a0a0f; --panel-bg: rgba(28, 33, 40, 0.75);
+            --border: rgba(139, 148, 158, 0.25); --glow: rgba(71, 133, 254, 0.5);
+            --blue: #4785fe; --cyan: #63d9e2;
+            --text-primary: #f0f6fc; --text-secondary: #a1aab4;
+            --ok: #23a951; --error: #f5443d; --warn: #f5a623;
+        }
+        *, *::before, *::after { box-sizing: border-box; }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
+        body {
+            background-color: var(--bg); color: var(--text-primary); font-family: 'Inter', sans-serif;
+            margin: 0; padding: 0; height: 100vh; width: 100vw; overflow: hidden;
+            background-image: radial-gradient(circle at 15% 25%, rgba(71, 133, 254, 0.1), transparent 35%), radial-gradient(circle at 85% 75%, rgba(99, 217, 226, 0.1), transparent 35%);
+        }
+        .hidden { display: none !important; }
+
+        /* --- Layout & Navigation --- */
+        #side-nav {
+            position: fixed; top: 0; left: 0; height: 100%; width: 280px;
+            background: var(--panel-bg); backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px);
+            border-right: 1px solid var(--border); transform: translateX(-100%);
+            transition: transform 0.4s ease-in-out; padding: 2rem; z-index: 1001;
+        }
+        #side-nav.open { transform: translateX(0); }
+        .main-content { padding: 2rem; padding-left: 80px; height: 100vh; display: flex; flex-direction: column; }
+        #menu-toggle-btn {
+            position: fixed; top: 1.5rem; left: 1.5rem; z-index: 1002;
+            background: rgba(28, 33, 40, 0.5); backdrop-filter: blur(10px);
+            border: 1px solid var(--border); border-radius: 50%; width: 50px; height: 50px;
+            color: var(--text-secondary); cursor: pointer; transition: all 0.2s ease;
+            display: flex; align-items: center; justify-content: center;
+        }
+        #menu-toggle-btn:hover { color: var(--text-primary); border-color: var(--blue); }
+        #menu-toggle-btn svg { width: 28px; height: 28px; }
+        .nav-title { font-size: 1.5rem; font-weight: 800; margin: 0 0 2rem 0; background: linear-gradient(90deg, var(--blue), var(--cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .nav-list { list-style: none; padding: 0; margin: 0; }
+        .nav-btn {
+            display: flex; align-items: center; gap: 1rem; width: 100%; background: none;
+            border: 1px solid transparent; color: var(--text-secondary); padding: 0.75rem 1rem;
+            border-radius: 12px; font-weight: 600; cursor: pointer; text-align: left; transition: all 0.2s ease;
+            font-size: 1rem;
+        }
+        .nav-btn:hover { background: rgba(71, 133, 254, 0.1); border-color: var(--border); color: var(--text-primary); }
+        .nav-btn svg { width: 24px; height: 24px; stroke-width: 2; }
+        
+        /* --- Modals & Panels --- */
+        .modal {
+            display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%;
+            align-items: center; justify-content: center;
+            background-color: rgba(0,0,0,0.7); backdrop-filter: blur(15px); animation: fadeIn 0.5s;
+        }
+        .modal-content {
+            background: var(--bg); margin: auto; padding: 2.5rem; border: 1px solid var(--border);
+            border-radius: 24px; width: 90%; max-width: 1400px; max-height: 90vh;
+            display: flex; flex-direction: column; position: relative;
+            box-shadow: 0 0 40px var(--glow);
+        }
+        .modal-body { overflow-y: auto; padding-right: 1rem; }
+        .close-btn { position: absolute; top: 1.5rem; right: 1.5rem; background: none; border: none; color: var(--text-secondary); font-size: 1.5rem; cursor: pointer;}
+        .panel-title { font-size: 1.5rem; font-weight: 800; margin: 0 0 1.5rem 0; background: linear-gradient(90deg, var(--blue), var(--cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .modal-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1.5rem; }
+        .control-group { background: var(--panel-bg); padding: 1.5rem; border-radius: 16px; border: 1px solid var(--border); }
+        .control-group h3 { margin-top: 0; font-weight: 700; color: var(--text-primary); border-bottom: 1px solid var(--border); padding-bottom: 0.75rem; margin-bottom: 1rem;}
+
+        /* --- Componentes Específicos --- */
+        .equipment-row { display: grid; grid-template-columns: 100px 1fr 50px 70px; gap: 1rem; align-items: center; margin-bottom: 1rem; border: 1px solid var(--border); padding: 1rem; border-radius: 12px; }
+        .equipment-row label { font-weight: 600; color: var(--text-secondary); }
+        select, input[type="text"], input[type="number"] { width: 100%; background: #000; color: var(--text-primary); border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem; }
+        .control-btn { background: linear-gradient(90deg, rgba(71, 133, 254, 0.1), rgba(99, 217, 226, 0.1)); border: 1px solid var(--border); color: var(--text-secondary); padding: 0.75rem 1rem; border-radius: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; }
+        .control-btn:hover { color: var(--text-primary); border-color: var(--blue); box-shadow: 0 0 15px var(--glow); }
+        .btn-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;}
+        .stat-grid { display: grid; grid-template-columns: auto 1fr; gap: 0.5rem 1.5rem; }
+        .stat-grid strong { color: var(--text-secondary); font-weight: 500; } .stat-grid span { font-weight: 600; }
+        #log-container { position: fixed; bottom: 1rem; left: 1.5rem; right: 1.5rem; height: 100px; background: rgba(0,0,0,0.5); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; overflow-y: auto; font-family: monospace; font-size: 0.8rem; z-index: 50; }
+        #windy-map { width: 100%; height: 400px; border-radius: 12px; border: 1px solid var(--border); }
+        .forecast-container { display: flex; gap: 1rem; overflow-x: auto; padding-bottom: 1rem; }
+        .forecast-card { flex: 0 0 100px; text-align: center; background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 12px; }
+        .switch { position: relative; display: inline-block; width: 60px; height: 34px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #333; transition: .4s; border-radius: 34px;}
+        .slider:before { position: absolute; content: ""; height: 26px; width: 26px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%;}
+        input:checked + .slider { background-color: var(--ok); } input:checked + .slider:before { transform: translateX(26px); }
+
+    </style>
+</head>
+<body>
+    <div id="setup-modal" class="modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <h2 class="panel-title">Bienvenido a Orion Controller</h2>
+            <p style="color:var(--text-secondary)">Introduce la dirección de tu API de N.I.N.A. para comenzar. La encontrarás en Opciones > Plugins > Advanced API.</p>
+            <input type="text" id="nina-address-input" placeholder="http://192.168.1.100:1888">
+            <button class="control-btn" id="btn-save-address" style="width:100%; margin-top: 1rem; padding: 1rem; background-image: linear-gradient(90deg, var(--blue), var(--cyan)); color: white;">Guardar y Conectar</button>
+        </div>
+    </div>
+    
+    <nav id="side-nav">
+        <h2 class="nav-title">Orion Controller</h2>
+        <!-- El contenido de la navegación se genera con JS -->
+    </nav>
+    <button id="menu-toggle-btn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18v2H3V4zm0 7h18v2H3v-2zm0 7h18v2H3v-2z"></path></svg></button>
+
+    <main class="main-content">
+        <div class="dashboard-main" style="flex-grow: 1; display: flex; align-items: center; justify-content: center;">
+             <h1 style="font-size: 4rem; text-align:center; filter: drop-shadow(0 0 20px var(--glow));" class="nav-title">Orion Controller</h1>
+        </div>
+        <div id="log-container"></div>
+    </main>
+    
+    <div id="modals-container"></div>
+
+    <script>
+        // --- CONFIGURACIÓN ---
+        const WEATHER_API_KEY = 'e0abe0f398645ba22b591690563e3178'; // Clave API de OpenWeatherMap
+        const FILTERS_TO_SHOW = ['Luminance', 'Red', 'Green', 'Blue', 'Ha', 'Oiii', 'Sii'];
+        const EQUIPMENT_TYPES = ['camera', 'mount', 'focuser', 'guider', 'filterwheel', 'rotator'];
+        const MODULES = [
+            { id: 'equipment', name: 'Equipamiento', icon: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 16v-2m8-8h-2M4 12H2m15.364 6.364l-1.414-1.414M6.05 6.05L4.636 4.636m12.728 0l-1.414 1.414M6.05 17.95l1.414-1.414M12 18a6 6 0 100-12 6 6 0 000 12z"></path></svg>` },
+            { id: 'guiding', name: 'Guiado', icon: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3v18h18M18.7 8a4.7 4.7 0 00-6.4 0l-4.3 4.3a4.7 4.7 0 006.4 6.4l4.3-4.3a4.7 4.7 0 00-6.4-6.4l-1.1 1.1"/></svg>` },
+            { id: 'camera', name: 'Cámara', icon: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>` },
+            { id: 'focuser', name: 'Enfocador', icon: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 10l-2 2m2-2l2 2m-2-2l-2-2m2 2l2-2"></path></svg>` },
+            { id: 'weather', name: 'Clima', icon: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"></path></svg>` },
+        ];
+        
+        let NINA_API_URL = '';
+        let updateInterval = null;
+        const charts = {};
+        const chartData = { guiderRMS: [], snr: [], temp: [] };
+        const MAX_HISTORY = 60; // Puntos de datos en las gráficas (5 min)
+
+        // --- Lógica de la Interfaz (Modales, Logs, etc.) ---
+        function openModal(id) {
+            document.querySelectorAll('.modal').forEach(m => m.style.display = 'none');
+            const modal = document.getElementById(`${id}-modal`);
+            if (modal) {
+                modal.style.display = 'flex';
+                document.getElementById('side-nav').classList.remove('open');
+                const populateFunctionName = `populate${id.charAt(0).toUpperCase() + id.slice(1)}Panel`;
+                if (window[populateFunctionName]) {
+                    window[populateFunctionName]();
+                }
+            }
+        }
+        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+        
+        function log(message, level = 'INFO') {
+            const colors = { INFO: 'var(--text-secondary)', OK: 'var(--ok)', ERROR: 'var(--error)', WARN: 'var(--warn)' };
+            const entry = document.createElement('div');
+            entry.innerHTML = `[${new Date().toLocaleTimeString()}] <span style="color:${colors[level]}">[${level}]</span> ${message}`;
+            const container = document.getElementById('log-container');
+            container.prepend(entry);
+            if(container.children.length > 100) {
+                container.removeChild(container.lastChild);
+            }
+        }
+        
+        // --- Llamadas a la API de N.I.N.A. ---
+        async function callNinaApi(endpoint) {
+             if (!NINA_API_URL) return null;
+             try {
+                 const response = await fetch(`${NINA_API_URL}/v2/api${endpoint}`, { signal: AbortSignal.timeout(4000) });
+                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                 const data = await response.json();
+                 if (!data.Success) throw new Error(data.Error || 'Comando falló en NINA');
+                 log(endpoint.split('?')[0], 'OK');
+                 return data.Response;
+             } catch (error) { log(`API Call Failed: ${endpoint.split('?')[0]} -> ${error.message}`, 'ERROR'); return null; }
+        }
+
+        // --- Lógica de Paneles ---
+
+        // Panel de Equipamiento
+        async function populateEquipmentPanel() {
+            const container = document.getElementById('equipment-modal-body');
+            container.innerHTML = '<p style="text-align:center; color: var(--text-secondary);">Cargando equipo...</p>';
+            let html = `<div class="btn-grid" style="margin-bottom: 2rem;"><button class="control-btn" onclick="connectAllDevices()">Conectar Todo</button><button class="control-btn" onclick="disconnectAllDevices()">Desconectar Todo</button></div>`;
+            for (const type of EQUIPMENT_TYPES) {
+                const info = await callNinaApi(`/equipment/${type}/info`);
+                const devices = info && info.AvailableDevices ? info.AvailableDevices : [];
+                let options = devices.map(d => `<option value="${d}" ${info && info.Device === d ? 'selected' : ''}>${d || 'No hay dispositivo'}</option>`).join('');
+                html += `
+                    <div class="equipment-row">
+                        <label>${type.charAt(0).toUpperCase() + type.slice(1)}:</label>
+                        <select onchange="callNinaApi('/equipment/${type}/connect?device=' + encodeURIComponent(this.value)); setTimeout(populateEquipmentPanel, 1000);">
+                            <option value="">-- Seleccionar --</option>
+                            ${options}
+                        </select>
+                        <button class="control-btn" onclick="populateEquipmentPanel()">⟳</button>
+                        <label class="switch"><input type="checkbox" onchange="callNinaApi('/equipment/${type}/' + (this.checked ? 'connect' : 'disconnect')); setTimeout(populateEquipmentPanel, 1000);" ${info && info.Connected ? 'checked' : ''}><span class="slider"></span></label>
+                    </div>`;
+            }
+            container.innerHTML = html;
+        }
+
+        async function connectAllDevices() { log('Conectando todo el equipo...'); for(const type of EQUIPMENT_TYPES) await callNinaApi(`/equipment/${type}/connect`); setTimeout(populateEquipmentPanel, 1000); }
+        async function disconnectAllDevices() { log('Desconectando todo el equipo...'); for(const type of [...EQUIPMENT_TYPES].reverse()) await callNinaApi(`/equipment/${type}/disconnect`); setTimeout(populateEquipmentPanel, 1000); }
+        
+        // Panel de Guiado
+        async function populateGuidingPanel() {
+            const container = document.getElementById('guiding-modal-body');
+            container.innerHTML = `
+                <div class="modal-grid">
+                    <div class="control-group">
+                        <h3>Estado del Guiado</h3>
+                        <div class="stat-grid">
+                            <strong>Estado:</strong> <span id="guider-state">--</span>
+                            <strong>RMS Total:</strong> <span id="guider-rms">--</span>
+                            <strong>RMS RA:</strong> <span id="guider-rms-ra">--</span>
+                            <strong>RMS DEC:</strong> <span id="guider-rms-dec">--</span>
+                            <strong>SNR:</strong> <span id="guider-snr">--</span>
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <h3>Controles</h3>
+                        <div class="btn-grid">
+                            <button class="control-btn" onclick="callNinaApi('/equipment/guider/start')">Iniciar Guiado</button>
+                            <button class="control-btn" onclick="callNinaApi('/equipment/guider/stop')">Detener Guiado</button>
+                            <button class="control-btn" onclick="callNinaApi('/equipment/guider/start?dither=true')">Dither</button>
+                            <button class="control-btn" onclick="callNinaApi('/equipment/guider/clear-calibration')">Limpiar Calibración</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="control-group" style="margin-top: 1.5rem;">
+                    <h3>Gráfica de Guiado (RMS Total)</h3>
+                    <canvas id="guiderChart"></canvas>
+                </div>`;
+            createChart('guiderChart', 'guiderRMS', 'RMS (")', chartData.guiderRMS, 'var(--cyan)');
+        }
+        
+        // Panel de Cámara
+        async function populateCameraPanel() {
+            const container = document.getElementById('camera-modal-body');
+            container.innerHTML = `
+                <div class="modal-grid">
+                    <div class="control-group">
+                        <h3>Estado de la Cámara</h3>
+                        <div class="stat-grid">
+                            <strong>Temperatura:</strong> <span id="camera-temp">--</span> &deg;C
+                            <strong>Potencia Cooler:</strong> <span id="camera-cooler-power">--</span> %
+                            <strong>Última Exposición:</strong> <span id="camera-last-exp">--</span> s
+                            <strong>Filtro Actual:</strong> <span id="camera-filter">--</span>
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <h3>Control de Exposición</h3>
+                        <div class="btn-grid">
+                            <input type="number" id="exp-time" placeholder="Tiempo (s)" value="5">
+                            <input type="number" id="exp-binning" placeholder="Binning" value="1">
+                            <button class="control-btn" onclick="callNinaApi('/equipment/camera/capture?exposure=' + document.getElementById('exp-time').value + '&binning=' + document.getElementById('exp-binning').value)">Tomar Foto</button>
+                            <button class="control-btn" style="background-image: linear-gradient(90deg, var(--error), #f5a623);" onclick="callNinaApi('/equipment/camera/abort-exposure')">Abortar</button>
+                        </div>
+                    </div>
+                     <div class="control-group">
+                        <h3>Control del Cooler</h3>
+                        <div class="btn-grid">
+                           <input type="number" id="cooler-setpoint" placeholder="Temp. Objetivo (&deg;C)" value="-10">
+                           <button class="control-btn" onclick="callNinaApi('/equipment/camera/cool?setpoint=' + document.getElementById('cooler-setpoint').value)">Enfriar</button>
+                           <button class="control-btn" onclick="callNinaApi('/equipment/camera/warm')">Calentar</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-grid" style="margin-top: 1.5rem;">
+                    <div class="control-group">
+                         <h3>Gráfica de Temperatura</h3>
+                         <canvas id="tempChart"></canvas>
+                    </div>
+                    <div class="control-group">
+                         <h3>Gráfica de SNR</h3>
+                         <canvas id="snrChart"></canvas>
+                    </div>
+                </div>
+            `;
+            createChart('tempChart', 'temp', 'Temperatura (°C)', chartData.temp, 'var(--blue)');
+            createChart('snrChart', 'snr', 'SNR', chartData.snr, 'var(--ok)');
+        }
+
+        // Panel de Enfocador
+        async function populateFocuserPanel() {
+            const container = document.getElementById('focuser-modal-body');
+            container.innerHTML = `
+                <div class="modal-grid">
+                    <div class="control-group">
+                        <h3>Estado del Enfocador</h3>
+                        <div class="stat-grid">
+                            <strong>Posición:</strong> <span id="focuser-pos">--</span>
+                            <strong>Temperatura:</strong> <span id="focuser-temp">--</span> &deg;C
+                            <strong>Compensación Temp:</strong> <span id="focuser-tempcomp">--</span>
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <h3>Controles</h3>
+                        <input type="number" id="focuser-steps" value="100" placeholder="Pasos">
+                        <div class="btn-grid" style="margin-top: 1rem;">
+                            <button class="control-btn" onclick="callNinaApi('/equipment/focuser/move?amount=-' + document.getElementById('focuser-steps').value)">Mover Adentro</button>
+                            <button class="control-btn" onclick="callNinaApi('/equipment/focuser/move?amount=' + document.getElementById('focuser-steps').value)">Mover Afuera</button>
+                             <button class="control-btn" style="background-image: linear-gradient(90deg, var(--blue), var(--cyan)); color: white;" onclick="callNinaApi('/equipment/focuser/auto-focus')">Autofoco</button>
+                        </div>
+                    </div>
+                </div>`;
+        }
+
+        // Panel de Clima
+        function populateWeatherPanel() {
+             const container = document.getElementById('weather-modal-body');
+             container.innerHTML = `
+                <div class="modal-grid">
+                   <div class="control-group" style="grid-column: 1 / -1;">
+                        <h3>Mapa de Nubosidad</h3>
+                        <iframe id="windy-map" src="" frameborder="0"></iframe>
+                    </div>
+                    <div class="control-group" style="grid-column: 1 / -1;">
+                        <h3>Pronóstico Próximas Horas</h3>
+                        <div id="forecast-container" class="forecast-container">
+                            <p style="color:var(--text-secondary)">Obteniendo pronóstico...</p>
+                        </div>
+                    </div>
+                </div>`;
+             getLocationAndWeather();
+        }
+
+        function getLocationAndWeather() {
+            log('Obteniendo ubicación y clima...');
+            if (navigator.geolocation) {
+                 navigator.geolocation.getCurrentPosition(
+                     pos => {
+                         const { latitude, longitude } = pos.coords;
+                         document.getElementById('windy-map').src = `https://embed.windy.com/embed2/windy?lat=${latitude}&lon=${longitude}&zoom=7&overlay=clouds&product=ecmwf&menu=false&message=false&metric_wind=km/h&metric_temp=°C`;
+                         
+                         fetch(`https://api.openweathermap.org/data/2.5/forecast?lat=${latitude}&lon=${longitude}&appid=${WEATHER_API_KEY}&units=metric&cnt=5`) // cnt=5 para 5x3=15 horas
+                            .then(res => res.json())
+                            .then(data => {
+                                 if (data.list) {
+                                     document.getElementById('forecast-container').innerHTML = data.list.map(item => {
+                                         const iconMap = {"Clear":"☀️", "Clouds":"☁️", "Rain":"🌧️", "Drizzle": "🌦️", "Thunderstorm": "⛈️", "Snow": "❄️", "Mist": "🌫️"};
+                                         return `<div class="forecast-card">
+                                             <div class="time" style="font-weight:bold;">${new Date(item.dt*1000).getHours()}:00</div>
+                                             <div class="icon" style="font-size: 2rem;">${iconMap[item.weather[0].main] || '🌌'}</div>
+                                             <div style="font-weight:600;">${item.main.temp.toFixed(0)}°C</div>
+                                             <div style="font-size:0.8rem;color:var(--text-secondary)">${item.clouds.all}% nubes</div>
+                                         </div>`;
+                                     }).join('');
+                                     log('Pronóstico del tiempo actualizado.', 'OK');
+                                 } else {
+                                     throw new Error("Formato de respuesta de API de clima inválido.");
+                                 }
+                         }).catch(err => log(`Error al obtener pronóstico: ${err.message}`, 'ERROR'));
+                     },
+                     err => log("No se pudo obtener la ubicación. Asegúrate de dar permisos.", 'ERROR')
+                 );
+            } else {
+                 log("La geolocalización no es soportada por este navegador.", "ERROR");
+            }
+        }
+        
+        // --- Gráficas y Actualización de Datos ---
+        function addChartData(history, value) {
+            if (!isFinite(value) || value === null) return;
+            history.push({x: Date.now(), y: value});
+            if(history.length > MAX_HISTORY) history.shift();
+        }
+
+        function createChart(ctxId, dataKey, label, data, color) {
+            const ctx = document.getElementById(ctxId);
+            if (!ctx) return;
+            if (charts[dataKey]) { charts[dataKey].destroy(); }
+
+            charts[dataKey] = new Chart(ctx, {
+                type: 'line',
+                data: { datasets: [{
+                    label: label, data: data,
+                    borderColor: color, backgroundColor: `${color}33`,
+                    borderWidth: 2, pointRadius: 1, tension: 0.4,
+                }]},
+                options: {
+                    scales: {
+                        x: { type: 'time', time: { unit: 'minute' }, grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: 'var(--text-secondary)'} },
+                        y: { beginAtZero: false, grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: 'var(--text-secondary)'} }
+                    },
+                    plugins: { legend: { display: false } },
+                    maintainAspectRatio: false
+                }
+            });
+        }
+        
+        async function updateData() {
+            // Actualizar UI y Gráficas
+            const cameraInfo = await callNinaApi('/equipment/camera/info');
+            if (cameraInfo) {
+                document.getElementById('camera-temp').textContent = cameraInfo.Temperature?.toFixed(1) || '--';
+                document.getElementById('camera-cooler-power').textContent = cameraInfo.CoolerPower?.toFixed(0) || '--';
+                document.getElementById('camera-last-exp').textContent = cameraInfo.LastExposureDuration || '--';
+                document.getElementById('camera-filter').textContent = cameraInfo.Filter || '--';
+                addChartData(chartData.temp, cameraInfo.Temperature);
+                addChartData(chartData.snr, cameraInfo.LastExposureSNR);
+                if(charts.temp) charts.temp.update();
+                if(charts.snr) charts.snr.update();
+            }
+
+            const guiderInfo = await callNinaApi('/equipment/guider/info');
+            if (guiderInfo) {
+                document.getElementById('guider-state').textContent = guiderInfo.State || '--';
+                document.getElementById('guider-rms').textContent = guiderInfo.RMSTotal?.toFixed(2) || '--';
+                document.getElementById('guider-rms-ra').textContent = guiderInfo.RMSRA?.toFixed(2) || '--';
+                document.getElementById('guider-rms-dec').textContent = guiderInfo.RMSDEC?.toFixed(2) || '--';
+                document.getElementById('guider-snr').textContent = guiderInfo.SNR?.toFixed(1) || '--';
+                addChartData(chartData.guiderRMS, guiderInfo.RMSTotal);
+                if(charts.guiderRMS) charts.guiderRMS.update();
+            }
+
+            const focuserInfo = await callNinaApi('/equipment/focuser/info');
+            if (focuserInfo) {
+                document.getElementById('focuser-pos').textContent = focuserInfo.Position || '--';
+                document.getElementById('focuser-temp').textContent = focuserInfo.Temperature?.toFixed(1) || '--';
+                document.getElementById('focuser-tempcomp').textContent = focuserInfo.TempCompAvailable ? (focuserInfo.TempCompEnabled ? 'Activada' : 'Desactivada') : 'No Disponible';
+            }
+        }
+        
+        // --- Inicialización ---
+        function initAndConnect() {
+            const address = document.getElementById('nina-address-input').value.trim();
+            if (address && (address.startsWith('http://') || address.startsWith('https://'))) {
+                NINA_API_URL = address;
+                localStorage.setItem('nina_api_url', address);
+                document.getElementById('setup-modal').style.display = 'none';
+                log(`Conectando a N.I.N.A. en: ${address}`, 'OK');
+                
+                // Limpiar intervalo anterior si existe
+                if (updateInterval) clearInterval(updateInterval);
+                
+                // Iniciar el bucle de actualización de datos
+                updateData(); // Llamada inicial inmediata
+                updateInterval = setInterval(updateData, 5000); // Actualizar cada 5 segundos
+            } else {
+                log('Por favor, introduce una dirección de API válida (ej. http://192.168.1.100:1888).', 'ERROR');
+            }
+        }
+        
+        window.addEventListener('load', () => {
+            const modalsContainer = document.getElementById('modals-container');
+            const sideNav = document.getElementById('side-nav');
+            const navList = document.createElement('ul');
+            navList.className = 'nav-list';
+
+            // Generar modales y botones de navegación
+            MODULES.forEach(m => {
+                const modal = document.createElement('div');
+                modal.id = `${m.id}-modal`;
+                modal.className = 'modal';
+                modal.innerHTML = `
+                    <div class="modal-content">
+                        <button class="close-btn" onclick="closeModal('${m.id}-modal')">×</button>
+                        <h2 class="panel-title">${m.name}</h2>
+                        <div class="modal-body" id="${m.id}-modal-body"></div>
+                    </div>`;
+                modalsContainer.appendChild(modal);
+
+                const navItem = document.createElement('li');
+                navItem.className = 'nav-item';
+                const navBtn = document.createElement('button');
+                navBtn.className = 'nav-btn';
+                navBtn.innerHTML = `${m.icon} ${m.name}`;
+                navBtn.onclick = () => openModal(m.id);
+                navItem.appendChild(navBtn);
+                navList.appendChild(navItem);
+            });
+            sideNav.appendChild(navList);
+            
+            // Lógica de inicio
+            const savedAddress = localStorage.getItem('nina_api_url');
+            const addressInput = document.getElementById('nina-address-input');
+            if (savedAddress) {
+                addressInput.value = savedAddress;
+            }
+            // Siempre mostrar el modal de configuración al inicio
+            document.getElementById('setup-modal').style.display = 'flex';
+            
+            // Listeners de eventos
+            document.getElementById('btn-save-address').addEventListener('click', initAndConnect);
+            addressInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    initAndConnect();
+                }
+            });
+
+            document.getElementById('menu-toggle-btn').addEventListener('click', () => {
+                document.getElementById('side-nav').classList.toggle('open');
+            });
+
+            // Cerrar menú lateral si se hace clic fuera
+            document.querySelector('.main-content').addEventListener('click', () => {
+                document.getElementById('side-nav').classList.remove('open');
+            });
+
+            log("Orion Controller iniciado. Introduce la IP de N.I.N.A para conectar.");
+        });
+    </script>
+</body>
+</html>
