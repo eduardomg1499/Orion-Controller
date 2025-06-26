@@ -3,152 +3,251 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Orion Controller | N.I.N.A.</title>
+    <title>Orion Controller v10 | N.I.N.A.</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <!-- Leaflet.js for Weather Map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
     <style>
         :root {
-            --bg: #0a0a0f; --panel-bg: rgba(28, 33, 40, 0.75);
-            --border: rgba(139, 148, 158, 0.25); --glow: rgba(71, 133, 254, 0.5);
+            --bg: #0a0a0f; --panel-bg: rgba(20, 25, 33, 0.6);
+            --border: rgba(139, 148, 158, 0.25); --glow-color: rgba(71, 133, 254, 0.5);
             --blue: #4785fe; --cyan: #63d9e2;
             --text-primary: #f0f6fc; --text-secondary: #a1aab4;
             --ok: #23a951; --error: #f5443d; --warn: #f5a623;
         }
         *, *::before, *::after { box-sizing: border-box; }
         @keyframes fadeIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
+        
+        /* --- Animated Background & Glows --- */
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 20px -5px var(--glow-color); }
+            50% { box-shadow: 0 0 30px 0px var(--glow-color); }
+        }
+        @keyframes soft-blink {
+            0% { opacity: 0.05; transform: scale(0.95); }
+            50% { opacity: 0.2; transform: scale(1); }
+            100% { opacity: 0.05; transform: scale(0.95); }
+        }
+
         body {
             background-color: var(--bg); color: var(--text-primary); font-family: 'Inter', sans-serif;
             margin: 0; padding: 0; height: 100vh; width: 100vw; overflow: hidden;
-            background-image: radial-gradient(circle at 15% 25%, rgba(71, 133, 254, 0.1), transparent 35%), radial-gradient(circle at 85% 75%, rgba(99, 217, 226, 0.1), transparent 35%);
         }
+        .light-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; overflow: hidden; z-index: -1; }
+        .light {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(120px);
+            animation: soft-blink 15s infinite;
+        }
+
         .hidden { display: none !important; }
 
         /* --- Layout & Navigation --- */
         #side-nav {
             position: fixed; top: 0; left: 0; height: 100%; width: 280px;
-            background: var(--panel-bg); backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px);
+            background: var(--panel-bg); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
             border-right: 1px solid var(--border); transform: translateX(-100%);
-            transition: transform 0.4s ease-in-out; padding: 2rem; z-index: 1001;
+            transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+            padding: 2rem; z-index: 1001;
+            display: flex; flex-direction: column;
         }
         #side-nav.open { transform: translateX(0); }
-        
-        .main-content, #log-container, #menu-toggle-btn {
-            transition: transform 0.4s ease-in-out, filter 0.4s ease-in-out;
+        #side-nav.open .nav-btn { animation: slideInFromLeft 0.5s both; }
+        @keyframes slideInFromLeft {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
         }
-
-        body.nav-open > .main-content,
-        body.nav-open > #log-container {
+        .main-content, #menu-toggle-btn {
+            transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), filter 0.4s ease-in-out;
+        }
+        body.nav-open > .main-content, body.nav-open > #bottom-widgets {
             transform: translateX(280px);
             filter: brightness(0.6);
         }
-
         .main-content { padding: 2rem; padding-left: 80px; height: 100vh; display: flex; flex-direction: column; }
         #menu-toggle-btn {
             position: fixed; top: 1.5rem; left: 1.5rem; z-index: 1002;
-            background: rgba(28, 33, 40, 0.5); backdrop-filter: blur(10px);
+            background: rgba(28, 33, 40, 0.5); backdrop-filter: blur(15px);
             border: 1px solid var(--border); border-radius: 50%; width: 50px; height: 50px;
-            color: var(--text-secondary); cursor: pointer;
-            display: flex; align-items: center; justify-content: center;
+            color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center;
         }
         #menu-toggle-btn:hover { color: var(--text-primary); border-color: var(--blue); }
         #menu-toggle-btn svg { width: 28px; height: 28px; }
-        .nav-title { font-size: 1.5rem; font-weight: 800; margin: 0 0 2rem 0; background: linear-gradient(90deg, var(--blue), var(--cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .nav-list { list-style: none; padding: 0; margin: 0; }
-        .nav-btn {
-            display: flex; align-items: center; gap: 1rem; width: 100%; background: none;
-            border: 1px solid transparent; color: var(--text-secondary); padding: 0.75rem 1rem;
-            border-radius: 12px; font-weight: 600; cursor: pointer; text-align: left; transition: all 0.2s ease;
-            font-size: 1rem;
-        }
-        .nav-btn:hover { background: rgba(71, 133, 254, 0.1); border-color: var(--border); color: var(--text-primary); }
-        .nav-btn svg { width: 24px; height: 24px; stroke-width: 2; }
+        .nav-header { padding-top: 50px; margin-bottom: 2rem;}
+        .nav-title { font-size: 1.5rem; font-weight: 800; margin: 0; background: linear-gradient(90deg, var(--blue), var(--cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .nav-list { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex-grow: 1;}
+        .nav-footer { margin-top: 2rem; border-top: 1px solid var(--border); padding-top: 1rem;}
         
         /* --- Modals & Panels --- */
         .modal {
             display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%;
-            align-items: center; justify-content: center;
-            background-color: rgba(0,0,0,0.7); backdrop-filter: blur(15px); animation: fadeIn 0.5s;
+            align-items: center; justify-content: center; background-color: rgba(0,0,0,0.7); backdrop-filter: blur(15px); animation: fadeIn 0.5s;
         }
         .modal-content {
-            background: var(--bg); margin: auto; padding: 2.5rem; border: 1px solid var(--border);
+            background: var(--panel-bg); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
+            margin: auto; padding: 2.5rem; border: 1px solid var(--border);
             border-radius: 24px; width: 90%; max-width: 1400px; max-height: 90vh;
             display: flex; flex-direction: column; position: relative;
-            box-shadow: 0 0 40px var(--glow);
+            animation: pulse-glow 4s ease-in-out infinite;
         }
         .modal-body { overflow-y: auto; padding-right: 1rem; }
         .close-btn { position: absolute; top: 1.5rem; right: 1.5rem; background: none; border: none; color: var(--text-secondary); font-size: 1.5rem; cursor: pointer;}
-        .panel-title { font-size: 1.5rem; font-weight: 800; margin: 0 0 1.5rem 0; background: linear-gradient(90deg, var(--blue), var(--cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .panel-title { 
+            font-size: 1.5rem; font-weight: 800; margin: 0 0 1.5rem 0; 
+            background: linear-gradient(90deg, var(--blue), var(--cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            position: relative; padding-bottom: 0.5rem;
+        }
+        .panel-title::after {
+            content: ''; position: absolute; bottom: 0; left: 0;
+            width: 100%; height: 2px;
+            background: linear-gradient(90deg, var(--blue), var(--cyan));
+            animation: pulse-glow 3s infinite alternate;
+        }
         .modal-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1.5rem; }
-        .control-group { background: var(--panel-bg); padding: 1.5rem; border-radius: 16px; border: 1px solid var(--border); }
+        .control-group { background: rgba(10, 10, 15, 0.5); padding: 1.5rem; border-radius: 16px; border: 1px solid var(--border); }
         .control-group h3 { margin-top: 0; font-weight: 700; color: var(--text-primary); border-bottom: 1px solid var(--border); padding-bottom: 0.75rem; margin-bottom: 1rem;}
 
+        /* --- Button Animations --- */
+        .control-btn, .nav-btn, .d-pad-btn {
+            padding: 0.75rem 1rem; border: none; outline: none; color: var(--text-primary);
+            background: #111; cursor: pointer; position: relative; z-index: 0;
+            border-radius: 10px; font-weight: 600; font-size: 1rem;
+            font-family: 'Inter', sans-serif; text-align: center;
+        }
+        .nav-btn { text-align: left; display: flex; align-items: center; gap: 1rem; }
+        .btn-grid { display: flex; flex-wrap: wrap; gap: 1rem;}
+
+        .control-btn:before, .nav-btn:before, .d-pad-btn:before {
+            content: ''; background: linear-gradient(45deg, var(--blue), var(--cyan), #7a00ff, var(--cyan), var(--blue));
+            position: absolute; top: -2px; left:-2px; background-size: 400%;
+            z-index: -1; filter: blur(5px); width: calc(100% + 4px); height: calc(100% + 4px);
+            animation: glowing 20s linear infinite; opacity: 0; transition: opacity .3s ease-in-out;
+            border-radius: 10px;
+        }
+        .control-btn:hover:before, .nav-btn:hover:before, .d-pad-btn:hover:before { opacity: 1; }
+        .control-btn:after, .nav-btn:after, .d-pad-btn:after {
+            z-index: -1; content: ''; position: absolute; width: 100%; height: 100%;
+            background: #111; left: 0; top: 0; border-radius: 10px;
+        }
+        @keyframes glowing { 0% { background-position: 0 0; } 50% { background-position: 400% 0; } 100% { background-position: 0 0; } }
+        .particle { position: absolute; background: var(--cyan); border-radius: 50%; pointer-events: none; z-index: 1005; }
+        
         /* --- Specific Components --- */
-        .equipment-row { display: grid; grid-template-columns: 100px 1fr 50px 70px; gap: 1rem; align-items: center; margin-bottom: 1rem; border: 1px solid var(--border); padding: 1rem; border-radius: 12px; }
+        .stat-grid { display: grid; grid-template-columns: auto 1fr; gap: 0.5rem 1.5rem; align-items: center;}
+        .progress-bar { width: 100%; background-color: #333; border-radius: 5px; overflow: hidden; }
+        .progress-bar-inner { height: 10px; background-color: var(--blue); width: 0%; transition: width 0.5s ease; }
+        .equipment-row { display: grid; grid-template-columns: 100px 1fr auto 70px; gap: 1rem; align-items: center; margin-bottom: 1rem; border: 1px solid var(--border); padding: 1rem; border-radius: 12px; }
         .equipment-row label { font-weight: 600; color: var(--text-secondary); }
         select, input[type="text"], input[type="number"] { width: 100%; background: #000; color: var(--text-primary); border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem; }
-        .control-btn { background: linear-gradient(90deg, rgba(71, 133, 254, 0.1), rgba(99, 217, 226, 0.1)); border: 1px solid var(--border); color: var(--text-secondary); padding: 0.75rem 1rem; border-radius: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; }
-        .control-btn:hover { color: var(--text-primary); border-color: var(--blue); box-shadow: 0 0 15px var(--glow); }
-        .btn-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;}
-        .stat-grid { display: grid; grid-template-columns: auto 1fr; gap: 0.5rem 1.5rem; }
-        .stat-grid strong { color: var(--text-secondary); font-weight: 500; } .stat-grid span { font-weight: 600; }
-        #log-container { position: fixed; bottom: 1rem; left: 1.5rem; right: 1.5rem; height: 100px; background: rgba(0,0,0,0.5); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; overflow-y: auto; font-family: monospace; font-size: 0.8rem; z-index: 50; }
-        #windy-map { width: 100%; height: 400px; border-radius: 12px; border: 1px solid var(--border); }
-        .forecast-container { display: flex; gap: 1rem; overflow-x: auto; padding-bottom: 1rem; }
-        .forecast-card { flex: 0 0 100px; text-align: center; background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 12px; }
+        .chart-container { position: relative; height: 250px; width: 100%; }
+        
+        /* --- Switch Toggle --- */
         .switch { position: relative; display: inline-block; width: 60px; height: 34px; }
         .switch input { opacity: 0; width: 0; height: 0; }
         .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #333; transition: .4s; border-radius: 34px;}
         .slider:before { position: absolute; content: ""; height: 26px; width: 26px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%;}
         input:checked + .slider { background-color: var(--ok); } input:checked + .slider:before { transform: translateX(26px); }
 
-        /* Chart container fix */
-        .chart-container {
-            position: relative;
-            height: 250px;
-            width: 100%;
-        }
+        /* --- Mount Control Pad --- */
+        .d-pad-container { display: grid; grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 1fr 1fr 1fr; gap: 0.5rem; width: 150px; margin: 1rem auto; }
+        .d-pad-btn { font-size: 1.5rem; aspect-ratio: 1/1; display: flex; align-items: center; justify-content: center; padding: 0;}
+        #d-pad-stop { background-color: rgba(245, 68, 61, 0.3); font-size: 1rem; font-weight: bold; }
+        #d-pad-n { grid-column: 2; grid-row: 1; } #d-pad-w { grid-column: 1; grid-row: 2; }
+        #d-pad-stop { grid-column: 2; grid-row: 2; }
+        #d-pad-e { grid-column: 3; grid-row: 2; } #d-pad-s { grid-column: 2; grid-row: 3; }
+        
+        /* --- Bottom Widgets & Weather --- */
+        #bottom-widgets { position: fixed; bottom: 1rem; right: 1.5rem; z-index: 1003; display: flex; gap: 1rem; align-items: center; transition: transform 0.4s ease-in-out; }
+        #status-widget, #log-toggle-btn { background: var(--panel-bg); backdrop-filter: blur(15px); border: 1px solid var(--border); padding: 0.5rem 1rem; border-radius: 12px; font-weight: 600; display: flex; align-items: center; gap: 0.75rem; }
+        #status-indicator { width: 12px; height: 12px; border-radius: 50%; transition: background-color 0.5s; }
+        .status-disconnected { background-color: var(--error); }
+        .status-connecting { background-color: var(--warn); animation: pulse-glow 2s infinite; --glow-color: var(--warn); }
+        .status-connected { background-color: var(--ok); animation: pulse-glow 3s infinite; --glow-color: var(--ok); }
+        #ping-indicator { display: flex; align-items: flex-end; gap: 2px; height: 12px; }
+        .ping-bar { width: 4px; background-color: #555; transition: all 0.3s; }
+        .ping-bar.active { background-color: var(--ok); }
+        .ping-bar:nth-child(1) { height: 25%; } .ping-bar:nth-child(2) { height: 50%; }
+        .ping-bar:nth-child(3) { height: 75%; } .ping-bar:nth-child(4) { height: 100%; }
+        #weather-map { width: 100%; height: 300px; border-radius: 12px; border: 1px solid var(--border); background-color: #1a1a1a; }
+        .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.9); }
+        .forecast-container { display: flex; gap: 1rem; overflow-x: auto; padding-bottom: 1rem; }
+        .forecast-card { flex: 0 0 100px; text-align: center; background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 12px; }
 
+        /* --- Camera Panel --- */
+        .image-viewer { position: relative; width: 100%; aspect-ratio: 4/3; background-color: #000; border-radius: 12px; overflow: hidden; display: flex; align-items: center; justify-content: center;}
+        .image-viewer img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .image-viewer-btn { position: absolute; top: 0.5rem; right: 0.5rem; background: rgba(0,0,0,0.5); border: none; color: white; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; }
+        #fullscreen-modal { background: rgba(0,0,0,0.9); }
+        #fullscreen-modal .modal-content { background: none; border: none; animation: none; padding: 0; }
+        #fullscreen-image { width: 100%; height: 100%; object-fit: contain; }
+        
+        /* --- Toast Notification --- */
+        #toast-container { position: fixed; top: 2rem; right: 2rem; z-index: 2000; }
+        .toast { background: var(--panel-bg); backdrop-filter: blur(15px); color: var(--text-primary); padding: 1rem 1.5rem; border-radius: 12px;
+            border: 1px solid var(--border); margin-bottom: 1rem; opacity: 0; transform: translateX(100%);
+            animation: slideIn 0.5s forwards, slideOut 0.5s 4.5s forwards;
+        }
+        .toast.error { border-left: 5px solid var(--error); }
+        @keyframes slideIn { to { opacity: 1; transform: translateX(0); } }
+        @keyframes slideOut { to { opacity: 0; transform: translateX(100%); } }
     </style>
 </head>
 <body>
+    <div class="light-container"></div>
+    <div id="toast-container"></div>
+
     <div id="setup-modal" class="modal">
         <div class="modal-content" style="max-width: 500px;">
             <h2 class="panel-title">Bienvenido a Orion Controller</h2>
-            <p style="color:var(--text-secondary)">Introduce la dirección de tu API de N.I.N.A. para comenzar. La encontrarás en Opciones > Plugins > Advanced API.</p>
+            <p style="color:var(--text-secondary)">Introduce tu URL de N.I.N.A. para comenzar. Puede ser local, VPN o de Tailscale Funnel.</p>
             <input type="text" id="nina-address-input" placeholder="http://192.168.1.100:1888">
             <button class="control-btn" id="btn-save-address" style="width:100%; margin-top: 1rem; padding: 1rem; background-image: linear-gradient(90deg, var(--blue), var(--cyan)); color: white;">Guardar y Conectar</button>
         </div>
     </div>
     
-    <nav id="side-nav">
-        <h2 class="nav-title">Orion Controller</h2>
-        <!-- Navigation content is generated by JS -->
-    </nav>
-    <button id="menu-toggle-btn">
-        <!-- SVG icon is managed by JS -->
-    </button>
+    <nav id="side-nav"></nav>
+    <button id="menu-toggle-btn"></button>
 
     <main class="main-content">
         <div class="dashboard-main" style="flex-grow: 1; display: flex; align-items: center; justify-content: center;">
-             <h1 style="font-size: 4rem; text-align:center; filter: drop-shadow(0 0 20px var(--glow));" class="nav-title">Orion Controller</h1>
+             <h1 style="font-size: 4rem; text-align:center; filter: drop-shadow(0 0 20px var(--glow-color)); --glow-color: var(--cyan);" class="nav-title">Orion Controller</h1>
         </div>
-        <div id="log-container"></div>
     </main>
     
     <div id="modals-container"></div>
+    <div id="bottom-widgets">
+        <button id="log-toggle-btn" class="control-btn">Logs</button>
+        <div id="status-widget">
+            <div id="status-indicator"></div>
+            <span id="status-text">Desconectado</span>
+            <div id="ping-indicator">
+                <div class="ping-bar"></div><div class="ping-bar"></div><div class="ping-bar"></div><div class="ping-bar"></div>
+            </div>
+        </div>
+    </div>
+    <div id="fullscreen-modal" class="modal">
+        <div class="modal-content">
+            <button class="close-btn" onclick="closeModal('fullscreen-modal')">×</button>
+            <img id="fullscreen-image" src="">
+        </div>
+    </div>
 
     <script>
-        // --- CONFIGURATION ---
         const WEATHER_API_KEY = 'e0abe0f398645ba22b591690563e3178';
-        const FILTERS_TO_SHOW = ['Luminance', 'Red', 'Green', 'Blue', 'Ha', 'Oiii', 'Sii'];
         const EQUIPMENT_TYPES = ['camera', 'mount', 'focuser', 'guider', 'filterwheel', 'rotator'];
         const MODULES = [
             { id: 'equipment', name: 'Equipamiento', icon: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 16v-2m8-8h-2M4 12H2m15.364 6.364l-1.414-1.414M6.05 6.05L4.636 4.636m12.728 0l-1.414 1.414M6.05 17.95l1.414-1.414M12 18a6 6 0 100-12 6 6 0 000 12z"></path></svg>` },
+            { id: 'mount', name: 'Montura', icon: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2h8a2 2 0 002-2v-1a2 2 0 012-2h1.945M7.881 4.122A5.981 5.981 0 0012 3c1.383 0 2.67.456 3.655 1.238M12 18V9m0 9a2 2 0 01-2-2v-1a2 2 0 012-2h.01a2 2 0 012 2v1a2 2 0 01-2 2h-.01z"/></svg>`},
+            { id: 'sequencer', name: 'Secuenciador', icon: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>`},
+            { id: 'profiles', name: 'Perfiles', icon: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>`},
             { id: 'guiding', name: 'Guiado', icon: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3v18h18M18.7 8a4.7 4.7 0 00-6.4 0l-4.3 4.3a4.7 4.7 0 006.4 6.4l4.3-4.3a4.7 4.7 0 00-6.4-6.4l-1.1 1.1"/></svg>` },
             { id: 'camera', name: 'Cámara', icon: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>` },
             { id: 'focuser', name: 'Enfocador', icon: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 10l-2 2m2-2l2 2m-2-2l-2-2m2 2l2-2"></path></svg>` },
@@ -157,28 +256,28 @@
         
         let NINA_API_URL = '';
         let updateInterval = null;
+        let isConnected = false;
+        let hasConnectedOnce = false;
         const charts = {};
         const chartData = { guiderRMS: [], snr: [], temp: [] };
-        const MAX_HISTORY = 60; // Data points for charts (5 min)
+        const MAX_HISTORY = 60; 
 
         const ICONS = {
             menu: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18v2H3V4zm0 7h18v2H3v-2zm0 7h18v2H3v-2z"></path></svg>`,
             close: `<svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>`
         }
 
-        // --- UI Logic (Modals, Logs, etc.) ---
+        // --- UI Logic ---
         function openModal(id) {
             document.querySelectorAll('.modal').forEach(m => m.style.display = 'none');
             const modal = document.getElementById(`${id}-modal`);
             if (modal) {
                 modal.style.display = 'flex';
-                document.getElementById('side-nav').classList.remove('open');
                 document.body.classList.remove('nav-open');
+                document.getElementById('side-nav').classList.remove('open');
                 setMenuIcon(false);
                 const populateFunctionName = `populate${id.charAt(0).toUpperCase() + id.slice(1)}Panel`;
-                if (window[populateFunctionName]) {
-                    window[populateFunctionName]();
-                }
+                if (window[populateFunctionName]) window[populateFunctionName]();
             }
         }
         function closeModal(modalId) { document.getElementById(modalId).style.display = 'none'; }
@@ -187,142 +286,175 @@
             const colors = { INFO: 'var(--text-secondary)', OK: 'var(--ok)', ERROR: 'var(--error)', WARN: 'var(--warn)' };
             const entry = document.createElement('div');
             entry.innerHTML = `[${new Date().toLocaleTimeString()}] <span style="color:${colors[level]}">[${level}]</span> ${message}`;
-            const container = document.getElementById('log-container');
-            container.prepend(entry);
-            if(container.children.length > 100) {
-                container.removeChild(container.lastChild);
+            const container = document.getElementById('log-modal-body');
+            if(container) container.prepend(entry);
+        }
+
+        function showToast(message, type = 'error') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.remove();
+            }, 5000);
+        }
+
+        function updatePingIndicator(latency) {
+            const bars = document.querySelectorAll('#ping-indicator .ping-bar');
+            bars.forEach(bar => bar.style.backgroundColor = '#555'); // Reset
+            if (latency < 300) {
+                bars.forEach(bar => bar.style.backgroundColor = 'var(--ok)');
+            } else if (latency < 800) {
+                for(let i=0; i<3; i++) bars[i].style.backgroundColor = 'var(--warn)';
+            } else if (latency < 1500) {
+                for(let i=0; i<2; i++) bars[i].style.backgroundColor = 'var(--error)';
+            } else {
+                bars[0].style.backgroundColor = 'var(--error)';
             }
         }
-        
-        // --- N.I.N.A. API Calls ---
-        async function callNinaApi(endpoint) {
+
+        function setStatus(status, text) {
+            const indicator = document.getElementById('status-indicator');
+            const statusText = document.getElementById('status-text');
+            indicator.className = `status-${status}`;
+            statusText.textContent = text;
+            const wasConnected = isConnected;
+            isConnected = status === 'connected';
+            if (isConnected) hasConnectedOnce = true;
+            if (wasConnected && !isConnected && hasConnectedOnce) {
+                updatePingIndicator(9999);
+                showToast('Se perdió la conexión con N.I.N.A.');
+            }
+        }
+
+        // --- N.I.N.A. API Call ---
+        async function callNinaApi(endpoint, showOkLog = true) {
              if (!NINA_API_URL) return null;
+             const startTime = Date.now();
              try {
                  const response = await fetch(`${NINA_API_URL}/v2/api${endpoint}`, { signal: AbortSignal.timeout(4000) });
+                 const latency = Date.now() - startTime;
+                 updatePingIndicator(latency);
                  if (!response.ok) throw new Error(`HTTP ${response.status}`);
                  const data = await response.json();
                  if (!data.Success) throw new Error(data.Error || 'Comando falló en NINA');
-                 log(`API Call OK: ${endpoint.split('?')[0]}`, 'OK');
+                 if(showOkLog) log(`API Call OK: ${endpoint.split('?')[0]}`, 'OK');
+                 if(!isConnected) setStatus('connected', 'Conectado');
                  return data.Response;
-             } catch (error) { log(`API Call Failed: ${endpoint.split('?')[0]} -> ${error.message}`, 'ERROR'); return null; }
+             } catch (error) { 
+                log(`API Call Failed: ${endpoint.split('?')[0]} -> ${error.message}`, 'ERROR'); 
+                if(isConnected) setStatus('disconnected', 'Desconectado');
+                return null; 
+             }
         }
 
         // --- Panel Logic ---
-
-        async function populateEquipmentPanel() {
-            const container = document.getElementById('equipment-modal-body');
-            container.innerHTML = '<p style="text-align:center; color: var(--text-secondary);">Cargando equipo... Esta operación puede tardar unos segundos.</p>';
-            log('Fetching equipment status...');
-            let html = `<div class="btn-grid" style="margin-bottom: 2rem;"><button class="control-btn" onclick="connectAllDevices()">Conectar Todo</button><button class="control-btn" onclick="disconnectAllDevices()">Desconectar Todo</button></div>`;
-            for (const type of EQUIPMENT_TYPES) {
-                const info = await callNinaApi(`/equipment/${type}/info`);
-                // Note: info can be null if the API call fails
-                const devices = info?.AvailableDevices || [];
-                let options = devices.map(d => `<option value="${d}" ${info?.Device === d ? 'selected' : ''}>${d || 'No hay dispositivo'}</option>`).join('');
-                html += `
-                    <div class="equipment-row">
-                        <label>${type.charAt(0).toUpperCase() + type.slice(1)}:</label>
-                        <select onchange="callNinaApi('/equipment/${type}/connect?device=' + encodeURIComponent(this.value)); setTimeout(populateEquipmentPanel, 1000);">
-                            <option value="">-- Seleccionar --</option>
-                            ${options}
-                        </select>
-                        <button class="control-btn" onclick="populateEquipmentPanel()">⟳</button>
-                        <label class="switch"><input type="checkbox" onchange="callNinaApi('/equipment/${type}/' + (this.checked ? 'connect' : 'disconnect')); setTimeout(populateEquipmentPanel, 1000);" ${info?.Connected ? 'checked' : ''}><span class="slider"></span></label>
-                    </div>`;
+        async function populatePanel(panelId, contentPromise) {
+            const container = document.getElementById(panelId);
+            container.innerHTML = '<p style="text-align:center; color: var(--text-secondary);">Cargando datos...</p>';
+            try {
+                container.innerHTML = await contentPromise();
+                container.querySelectorAll('.control-btn, .d-pad-btn, .nav-btn').forEach(button => {
+                    button.addEventListener("click", createParticleBurst);
+                });
+                if(panelId === 'mount-modal-body') addDPadListeners();
+            } catch (e) {
+                container.innerHTML = `<p style="text-align:center; color: var(--error);">Error al cargar el panel: ${e.message}</p>`;
+                log(`Error populating panel ${panelId}: ${e.message}`, 'ERROR');
             }
-            container.innerHTML = html;
         }
 
+        async function populateEquipmentPanel() {
+            populatePanel('equipment-modal-body', async () => {
+                let html = `<div class="btn-grid" style="margin-bottom: 2rem;"><button class="control-btn" onclick="connectAllDevices()">Conectar Todo</button><button class="control-btn" onclick="disconnectAllDevices()">Desconectar Todo</button></div>`;
+                for (const type of EQUIPMENT_TYPES) {
+                    const info = await callNinaApi(`/equipment/${type}/info`, false);
+                    const devices = info?.AvailableDevices || [];
+                    let options = devices.map(d => `<option value="${d}" ${info?.Device === d ? 'selected' : ''}>${d || 'No hay dispositivo'}</option>`).join('');
+                    html += `
+                        <div class="equipment-row">
+                            <label>${type.charAt(0).toUpperCase() + type.slice(1)}:</label>
+                            <select onchange="callNinaApi('/equipment/${type}/connect?device=' + encodeURIComponent(this.value)); setTimeout(populateEquipmentPanel, 1000);">
+                                <option value="">-- Seleccionar --</option>
+                                ${options}
+                            </select>
+                            <button class="control-btn" onclick="populateEquipmentPanel()">⟳</button>
+                            <label class="switch"><input type="checkbox" onchange="callNinaApi('/equipment/${type}/' + (this.checked ? 'connect' : 'disconnect')); setTimeout(populateEquipmentPanel, 1000);" ${info?.Connected ? 'checked' : ''}><span class="slider"></span></label>
+                        </div>`;
+                }
+                return html;
+            });
+        }
         async function connectAllDevices() { log('Conectando todo el equipo...'); for(const type of EQUIPMENT_TYPES) await callNinaApi(`/equipment/${type}/connect`); setTimeout(populateEquipmentPanel, 1000); }
         async function disconnectAllDevices() { log('Desconectando todo el equipo...'); for(const type of [...EQUIPMENT_TYPES].reverse()) await callNinaApi(`/equipment/${type}/disconnect`); setTimeout(populateEquipmentPanel, 1000); }
         
-        async function populateGuidingPanel() {
-            const container = document.getElementById('guiding-modal-body');
-            container.innerHTML = `
+        async function populateMountPanel() {
+            populatePanel('mount-modal-body', async () => {
+                const info = await callNinaApi('/equipment/mount/info', false);
+                return `
                 <div class="modal-grid">
                     <div class="control-group">
-                        <h3>Estado del Guiado</h3>
-                        <div class="stat-grid">
-                            <strong>Estado:</strong> <span id="guider-state">--</span>
-                            <strong>RMS Total:</strong> <span id="guider-rms">--</span>
-                            <strong>RMS RA:</strong> <span id="guider-rms-ra">--</span>
-                            <strong>RMS DEC:</strong> <span id="guider-rms-dec">--</span>
-                            <strong>SNR:</strong> <span id="guider-snr">--</span>
+                        <h3>Estado de la Montura</h3>
+                        <div id="mount-stats-grid" class="stat-grid">
+                           <strong>Estado:</strong> <span>${info?.State || '--'}</span>
+                            <strong>AR/DEC:</strong> <span>${typeof info?.RightAscension === 'number' ? info.RightAscension.toFixed(2) : '--'} / ${typeof info?.Declination === 'number' ? info.Declination.toFixed(2) : '--'}</span>
+                            <strong>Alt/Az:</strong> <span>${typeof info?.Altitude === 'number' ? info.Altitude.toFixed(2) : '--'} / ${typeof info?.Azimuth === 'number' ? info.Azimuth.toFixed(2) : '--'}</span>
+                            <strong>Lado del Pier:</strong> <span>${info?.SideOfPier || '--'}</span>
                         </div>
-                    </div>
-                    <div class="control-group">
-                        <h3>Controles</h3>
+                         <h3 style="margin-top: 2rem;">Controles</h3>
                         <div class="btn-grid">
-                            <button class="control-btn" onclick="callNinaApi('/equipment/guider/start')">Iniciar Guiado</button>
-                            <button class="control-btn" onclick="callNinaApi('/equipment/guider/stop')">Detener Guiado</button>
-                            <button class="control-btn" onclick="callNinaApi('/equipment/guider/start?dither=true')">Dither</button>
-                            <button class="control-btn" onclick="callNinaApi('/equipment/guider/clear-calibration')">Limpiar Calibración</button>
+                            <button class="control-btn" onclick="callNinaApi('/equipment/mount/tracking?state=true')">Seguimiento ON</button>
+                            <button class="control-btn" onclick="callNinaApi('/equipment/mount/tracking?state=false')">Seguimiento OFF</button>
+                            <button class="control-btn" onclick="callNinaApi('/equipment/mount/park')">Aparcar</button>
+                            <button class="control-btn" onclick="callNinaApi('/equipment/mount/unpark')">Desaparcar</button>
                         </div>
                     </div>
-                </div>
-                <div class="control-group" style="margin-top: 1.5rem;">
-                    <h3>Gráfica de Guiado (RMS Total)</h3>
-                    <div class="chart-container"><canvas id="guiderChart"></canvas></div>
+                    <div class="control-group" style="text-align: center;">
+                        <h3>Control Manual</h3>
+                        <div class="d-pad-container">
+                            <div class="d-pad-btn" id="d-pad-n" data-direction="n">▲</div>
+                            <div class="d-pad-btn" id="d-pad-w" data-direction="w">◀</div>
+                            <div class="d-pad-btn" id="d-pad-stop">STOP</div>
+                            <div class="d-pad-btn" id="d-pad-e" data-direction="e">▶</div>
+                            <div class="d-pad-btn" id="d-pad-s" data-direction="s">▼</div>
+                        </div>
+                        <label for="slew-rate">Velocidad (Slew Rate)</label>
+                        <input type="range" id="slew-rate" min="1" max="9" value="5" style="width: 80%; margin-top: 0.5rem;">
+                    </div>
                 </div>`;
-            createChart('guiderChart', 'guiderRMS', 'RMS (")', chartData.guiderRMS, 'var(--cyan)');
+            });
+        }
+        function addDPadListeners() {
+            const stopSlew = () => callNinaApi('/equipment/mount/slew-stop');
+            document.getElementById('d-pad-stop').addEventListener('click', stopSlew);
+            ['n', 's', 'e', 'w'].forEach(dir => {
+                const btn = document.getElementById(`d-pad-${dir}`);
+                const startSlew = (e) => {
+                    e.preventDefault();
+                    const rate = document.getElementById('slew-rate').value;
+                    callNinaApi(`/equipment/mount/slew?direction=${dir}&rate=${rate}`);
+                };
+                btn.addEventListener('mousedown', startSlew);
+                btn.addEventListener('touchstart', startSlew);
+                btn.addEventListener('mouseup', stopSlew);
+                btn.addEventListener('touchend', stopSlew);
+                btn.addEventListener('mouseleave', stopSlew);
+            });
         }
         
-        async function populateCameraPanel() {
-            const container = document.getElementById('camera-modal-body');
-            container.innerHTML = `
-                <div class="modal-grid">
-                    <div class="control-group">
-                        <h3>Estado de la Cámara</h3>
-                        <div class="stat-grid">
-                            <strong>Temperatura:</strong> <span id="camera-temp">--</span> &deg;C
-                            <strong>Potencia Cooler:</strong> <span id="camera-cooler-power">--</span> %
-                            <strong>Última Exposición:</strong> <span id="camera-last-exp">--</span> s
-                            <strong>Filtro Actual:</strong> <span id="camera-filter">--</span>
-                        </div>
-                    </div>
-                    <div class="control-group">
-                        <h3>Control de Exposición</h3>
-                        <div class="btn-grid">
-                            <input type="number" id="exp-time" placeholder="Tiempo (s)" value="5">
-                            <input type="number" id="exp-binning" placeholder="Binning" value="1">
-                            <button class="control-btn" onclick="callNinaApi('/equipment/camera/capture?exposure=' + document.getElementById('exp-time').value + '&binning=' + document.getElementById('exp-binning').value)">Tomar Foto</button>
-                            <button class="control-btn" style="background-image: linear-gradient(90deg, var(--error), #f5a623);" onclick="callNinaApi('/equipment/camera/abort-exposure')">Abortar</button>
-                        </div>
-                    </div>
-                     <div class="control-group">
-                        <h3>Control del Cooler</h3>
-                        <div class="btn-grid">
-                           <input type="number" id="cooler-setpoint" placeholder="Temp. Objetivo (&deg;C)" value="-10">
-                           <button class="control-btn" onclick="callNinaApi('/equipment/camera/cool?setpoint=' + document.getElementById('cooler-setpoint').value)">Enfriar</button>
-                           <button class="control-btn" onclick="callNinaApi('/equipment/camera/warm')">Calentar</button>
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-grid" style="margin-top: 1.5rem;">
-                    <div class="control-group">
-                         <h3>Gráfica de Temperatura</h3>
-                         <div class="chart-container" style="height:200px"><canvas id="tempChart"></canvas></div>
-                    </div>
-                    <div class="control-group">
-                         <h3>Gráfica de SNR</h3>
-                         <div class="chart-container" style="height:200px"><canvas id="snrChart"></canvas></div>
-                    </div>
-                </div>
-            `;
-            createChart('tempChart', 'temp', 'Temperatura (°C)', chartData.temp, 'var(--blue)');
-            createChart('snrChart', 'snr', 'SNR', chartData.snr, 'var(--ok)');
-        }
-
         async function populateFocuserPanel() {
-            const container = document.getElementById('focuser-modal-body');
-            container.innerHTML = `
+            populatePanel('focuser-modal-body', async () => {
+                const info = await callNinaApi('/equipment/focuser/info', false);
+                return `
                 <div class="modal-grid">
                     <div class="control-group">
                         <h3>Estado del Enfocador</h3>
-                        <div class="stat-grid">
-                            <strong>Posición:</strong> <span id="focuser-pos">--</span>
-                            <strong>Temperatura:</strong> <span id="focuser-temp">--</span> &deg;C
-                            <strong>Compensación Temp:</strong> <span id="focuser-tempcomp">--</span>
+                        <div id="focuser-stats-grid" class="stat-grid">
+                            <strong>Posición:</strong> <span>${info?.Position || '--'}</span>
+                            <strong>Temperatura:</strong> <span>${typeof info?.Temperature === 'number' ? info.Temperature.toFixed(1) : '--'} &deg;C</span>
+                            <strong>Compensación Temp:</strong> <span>${info?.TempCompAvailable ? (info.TempCompEnabled ? 'Activada' : 'Desactivada') : 'No Disp.'}</span>
                         </div>
                     </div>
                     <div class="control-group">
@@ -331,28 +463,27 @@
                         <div class="btn-grid" style="margin-top: 1rem;">
                             <button class="control-btn" onclick="callNinaApi('/equipment/focuser/move?amount=-' + document.getElementById('focuser-steps').value)">Mover Adentro</button>
                             <button class="control-btn" onclick="callNinaApi('/equipment/focuser/move?amount=' + document.getElementById('focuser-steps').value)">Mover Afuera</button>
-                             <button class="control-btn" style="background-image: linear-gradient(90deg, var(--blue), var(--cyan)); color: white;" onclick="callNinaApi('/equipment/focuser/auto-focus')">Autofoco</button>
+                            <button class="control-btn" style="background-image: linear-gradient(90deg, var(--blue), var(--cyan)); color: white;" onclick="callNinaApi('/equipment/focuser/auto-focus')">Autofoco</button>
                         </div>
                     </div>
                 </div>`;
+            });
         }
 
-        function populateWeatherPanel() {
-             const container = document.getElementById('weather-modal-body');
-             container.innerHTML = `
+        async function populateWeatherPanel() {
+             populatePanel('weather-modal-body', async () => `
                 <div class="modal-grid">
                    <div class="control-group" style="grid-column: 1 / -1;">
                         <h3>Mapa de Nubosidad</h3>
-                        <iframe id="windy-map" src="" frameborder="0"></iframe>
+                        <div id="weather-map"></div>
                     </div>
                     <div class="control-group" style="grid-column: 1 / -1;">
-                        <h3>Pronóstico Próximas Horas</h3>
+                        <h3>Pronóstico <small>(Intervalos de 3 hrs)</small></h3>
                         <div id="forecast-container" class="forecast-container">
                             <p style="color:var(--text-secondary)">Obteniendo pronóstico...</p>
                         </div>
                     </div>
-                </div>`;
-             getLocationAndWeather();
+                </div>`).then(() => getLocationAndWeather());
         }
 
         function getLocationAndWeather() {
@@ -361,9 +492,19 @@
                  navigator.geolocation.getCurrentPosition(
                      pos => {
                          const { latitude, longitude } = pos.coords;
-                         document.getElementById('windy-map').src = `https://embed.windy.com/embed2/windy?lat=${latitude}&lon=${longitude}&zoom=7&overlay=clouds&product=ecmwf&menu=false&message=false&metric_wind=km/h&metric_temp=°C`;
+                         const mapContainer = document.getElementById('weather-map');
+                         if(mapContainer && !mapContainer._leaflet_id) {
+                            const map = L.map('weather-map').setView([latitude, longitude], 7);
+                            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                                attribution: '&copy; OpenStreetMap &copy; CARTO',
+                            }).addTo(map);
+                            L.tileLayer(`https://tile.openweathermap.org/map/clouds_new/{z}/{x}/{y}.png?appid=${WEATHER_API_KEY}`, {
+                                opacity: 0.7
+                            }).addTo(map);
+                            L.marker([latitude, longitude]).addTo(map);
+                         }
                          
-                         fetch(`https://api.openweathermap.org/data/2.5/forecast?lat=${latitude}&lon=${longitude}&appid=${WEATHER_API_KEY}&units=metric&cnt=5`)
+                         fetch(`https://api.openweathermap.org/data/2.5/forecast?lat=${latitude}&lon=${longitude}&appid=${WEATHER_API_KEY}&units=metric&cnt=8`)
                             .then(res => res.json())
                             .then(data => {
                                  if (data.list) {
@@ -385,100 +526,128 @@
             } else { log("La geolocalización no es soportada por este navegador.", "ERROR"); }
         }
         
-        // --- Charts and Data Update ---
-        function addChartData(history, value) {
-            if (!isFinite(value) || value === null) return;
-            history.push({x: Date.now(), y: value});
-            if(history.length > MAX_HISTORY) history.shift();
-        }
-
-        function createChart(ctxId, dataKey, label, data, color) {
-            const ctx = document.getElementById(ctxId)?.getContext('2d');
-            if (!ctx) return;
-            if (charts[dataKey]) { charts[dataKey].destroy(); }
-
-            charts[dataKey] = new Chart(ctx, {
-                type: 'line',
-                data: { datasets: [{
-                    label: label, data: data,
-                    borderColor: color, backgroundColor: `${color}33`,
-                    borderWidth: 2, pointRadius: 1, tension: 0.4, fill: true
-                }]},
-                options: {
-                    scales: {
-                        x: { type: 'time', time: { unit: 'minute', displayFormats: { minute: 'HH:mm' } }, grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: 'var(--text-secondary)'} },
-                        y: { beginAtZero: false, grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: 'var(--text-secondary)'} }
-                    },
-                    plugins: { legend: { display: false } },
-                    maintainAspectRatio: false,
-                    responsive: true
-                }
+        async function populateProfilesPanel() {
+            populatePanel('profiles-modal-body', async () => {
+                const info = await callNinaApi('/profile/show', false);
+                if (!info) return '<p>No se pudo cargar la información de perfiles.</p>';
+                
+                const options = info.AvailableProfiles.map(p => `<option value="${p}" ${info.CurrentProfile === p ? 'selected' : ''}>${p}</option>`).join('');
+                
+                return `
+                <div class="control-group">
+                    <h3>Gestión de Perfiles</h3>
+                    <div class="stat-grid">
+                        <strong>Perfil Activo:</strong>
+                        <span>${info.CurrentProfile || 'Ninguno'}</span>
+                        <strong>Cambiar Perfil:</strong>
+                        <select id="profile-selector" onchange="callNinaApi('/profile/switch?profile=' + this.value)">
+                            ${options}
+                        </select>
+                    </div>
+                </div>`;
             });
         }
-        
+
+        // --- Data Update Loop ---
         async function updateData() {
-            // This function runs in a loop to update dynamic data in the UI
-            // The check for element existence prevents errors if a modal is not open
-            const cameraInfo = await callNinaApi('/equipment/camera/info');
-            if (cameraInfo) {
-                if(document.getElementById('camera-temp')) document.getElementById('camera-temp').textContent = cameraInfo.Temperature?.toFixed(1) || '--';
-                if(document.getElementById('camera-cooler-power')) document.getElementById('camera-cooler-power').textContent = cameraInfo.CoolerPower?.toFixed(0) || '--';
-                if(document.getElementById('camera-last-exp')) document.getElementById('camera-last-exp').textContent = cameraInfo.LastExposureDuration || '--';
-                if(document.getElementById('camera-filter')) document.getElementById('camera-filter').textContent = cameraInfo.Filter || '--';
-                addChartData(chartData.temp, cameraInfo.Temperature);
-                addChartData(chartData.snr, cameraInfo.LastExposureSNR);
-                if(charts.temp) charts.temp.update('none');
-                if(charts.snr) charts.snr.update('none');
-            }
-
-            const guiderInfo = await callNinaApi('/equipment/guider/info');
-            if (guiderInfo) {
-                if(document.getElementById('guider-state')) document.getElementById('guider-state').textContent = guiderInfo.State || '--';
-                if(document.getElementById('guider-rms')) document.getElementById('guider-rms').textContent = guiderInfo.RMSTotal?.toFixed(2) || '--';
-                if(document.getElementById('guider-rms-ra')) document.getElementById('guider-rms-ra').textContent = guiderInfo.RMSRA?.toFixed(2) || '--';
-                if(document.getElementById('guider-rms-dec')) document.getElementById('guider-rms-dec').textContent = guiderInfo.RMSDEC?.toFixed(2) || '--';
-                if(document.getElementById('guider-snr')) document.getElementById('guider-snr').textContent = guiderInfo.SNR?.toFixed(1) || '--';
-                addChartData(chartData.guiderRMS, guiderInfo.RMSTotal);
-                if(charts.guiderRMS) charts.guiderRMS.update('none');
-            }
-
-            const focuserInfo = await callNinaApi('/equipment/focuser/info');
-            if (focuserInfo) {
-                if(document.getElementById('focuser-pos')) document.getElementById('focuser-pos').textContent = focuserInfo.Position || '--';
-                if(document.getElementById('focuser-temp')) document.getElementById('focuser-temp').textContent = focuserInfo.Temperature?.toFixed(1) || '--';
-                if(document.getElementById('focuser-tempcomp')) document.getElementById('focuser-tempcomp').textContent = focuserInfo.TempCompAvailable ? (focuserInfo.TempCompEnabled ? 'Activada' : 'Desactivada') : 'No Disp.';
-            }
+            if(!NINA_API_URL) return;
+            const version = await callNinaApi('/version', false);
+            if(version === null && isConnected) setStatus('disconnected', 'Desconectado');
         }
-        
+
         // --- Initialization ---
         function initAndConnect() {
             const address = document.getElementById('nina-address-input').value.trim();
-            if (address && (address.startsWith('http://') || address.startsWith('https://'))) {
+            if (address) {
                 NINA_API_URL = address;
                 localStorage.setItem('nina_api_url', address);
                 document.getElementById('setup-modal').style.display = 'none';
-                log(`Conectando a N.I.N.A. en: ${address}`, 'OK');
+                log(`Conectando a N.I.N.A. en: ${address}`, 'INFO');
+                setStatus('connecting', 'Conectando...');
                 
                 if (updateInterval) clearInterval(updateInterval);
-                
                 updateData();
-                updateInterval = setInterval(updateData, 5000); // Update every 5 seconds
+                updateInterval = setInterval(updateData, 5000);
             } else {
-                log('Por favor, introduce una dirección de API válida (ej. http://192.168.1.100:1888).', 'ERROR');
+                log('Por favor, introduce una dirección de API válida.', 'ERROR');
+            }
+        }
+        
+        function createParticleBurst(event) {
+            const button = event.currentTarget;
+            for (let i = 0; i < 15; i++) {
+                const particle = document.createElement('div');
+                particle.classList.add('particle');
+                document.body.appendChild(particle);
+
+                const size = Math.floor(Math.random() * 4 + 2);
+                particle.style.width = `${size}px`;
+                particle.style.height = `${size}px`;
+                
+                const rect = button.getBoundingClientRect();
+                const x = rect.left + rect.width / 2;
+                const y = rect.top + rect.height / 2;
+
+                particle.style.left = `${x}px`;
+                particle.style.top = `${y}px`;
+
+                const angle = Math.random() * 360 * Math.PI / 180;
+                const distance = Math.random() * 50 + 50;
+                
+                const animation = particle.animate([
+                    { transform: 'translate(-50%, -50%) scale(1)', opacity: 1 },
+                    { transform: `translate(calc(-50% + ${Math.cos(angle) * distance}px), calc(-50% + ${Math.sin(angle) * distance}px)) scale(0)`, opacity: 0 }
+                ], {
+                    duration: Math.random() * 500 + 500,
+                    easing: 'ease-out'
+                });
+                animation.onfinish = () => particle.remove();
             }
         }
 
         function setMenuIcon(isOpen) {
             document.getElementById('menu-toggle-btn').innerHTML = isOpen ? ICONS.close : ICONS.menu;
         }
-        
+
         window.addEventListener('load', () => {
+            const lightContainer = document.querySelector('.light-container');
+            for (let i = 0; i < 15; i++) {
+                const light = document.createElement('div');
+                light.className = 'light';
+                light.style.width = `${Math.random() * 250 + 150}px`;
+                light.style.height = light.style.width;
+                light.style.left = `${Math.random() * 100}%`;
+                light.style.top = `${Math.random() * 100}%`;
+                light.style.backgroundColor = Math.random() > 0.5 ? 'var(--blue)' : 'var(--cyan)';
+                light.style.animationDelay = `${Math.random() * 10}s`;
+                light.style.animationDuration = `${Math.random() * 10 + 8}s`;
+                lightContainer.appendChild(light);
+            }
+
             const modalsContainer = document.getElementById('modals-container');
             const sideNav = document.getElementById('side-nav');
+            
+            const navHeader = document.createElement('div');
+            navHeader.className = 'nav-header';
+            navHeader.innerHTML = `<h2 class="nav-title">Orion Controller</h2>`;
+            sideNav.appendChild(navHeader);
+
             const navList = document.createElement('ul');
             navList.className = 'nav-list';
+            sideNav.appendChild(navList);
 
-            MODULES.forEach(m => {
+            const logModal = document.createElement('div');
+            logModal.id = 'log-modal';
+            logModal.className = 'modal';
+            logModal.innerHTML = `
+                <div class="modal-content" style="height: 80vh;">
+                    <button class="close-btn" onclick="closeModal('log-modal')">×</button>
+                    <h2 class="panel-title">Registro de Eventos</h2>
+                    <div class="modal-body" id="log-modal-body" style="background: #000; border-radius: 8px; font-family: monospace; font-size: 0.9rem; flex-grow:1; padding: 1rem;"></div>
+                </div>`;
+            modalsContainer.appendChild(logModal);
+
+            MODULES.forEach((m, index) => {
                 const modal = document.createElement('div');
                 modal.id = `${m.id}-modal`;
                 modal.className = 'modal';
@@ -491,46 +660,283 @@
                 modalsContainer.appendChild(modal);
 
                 const navItem = document.createElement('li');
-                navItem.className = 'nav-item';
                 const navBtn = document.createElement('button');
                 navBtn.className = 'nav-btn';
-                navBtn.innerHTML = `${m.icon} ${m.name}`;
+                navBtn.style.animationDelay = `${index * 50}ms`;
+                navBtn.innerHTML = `${m.icon} <span>${m.name}</span>`;
                 navBtn.onclick = () => openModal(m.id);
                 navItem.appendChild(navBtn);
                 navList.appendChild(navItem);
             });
-            sideNav.appendChild(navList);
+
+            const navFooter = document.createElement('div');
+            navFooter.className = 'nav-footer';
+            navFooter.innerHTML = `<button class="nav-btn" id="reconfigure-btn"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg> <span>Configurar Conexión</span></button>`;
+            sideNav.appendChild(navFooter);
             
             const savedAddress = localStorage.getItem('nina_api_url');
-            const addressInput = document.getElementById('nina-address-input');
-            if (savedAddress) {
-                addressInput.value = savedAddress;
-            }
+            if (savedAddress) document.getElementById('nina-address-input').value = savedAddress;
             document.getElementById('setup-modal').style.display = 'flex';
             
             document.getElementById('btn-save-address').addEventListener('click', initAndConnect);
-            addressInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') initAndConnect();
+            document.getElementById('nina-address-input').addEventListener('keypress', e => e.key === 'Enter' && initAndConnect());
+            document.getElementById('log-toggle-btn').addEventListener('click', () => openModal('log'));
+            document.getElementById('reconfigure-btn').addEventListener('click', () => {
+                document.getElementById('setup-modal').style.display = 'flex';
+                if(updateInterval) clearInterval(updateInterval);
+                setStatus('disconnected', 'Desconectado');
+                hasConnectedOnce = false;
             });
 
             const menuButton = document.getElementById('menu-toggle-btn');
-            setMenuIcon(false); // Set initial icon
-            menuButton.addEventListener('click', (e) => {
+            setMenuIcon(false);
+            menuButton.addEventListener('click', e => {
                 e.stopPropagation();
                 const isOpen = document.body.classList.toggle('nav-open');
-                document.getElementById('side-nav').classList.toggle('open', isOpen);
+                sideNav.classList.toggle('open', isOpen);
                 setMenuIcon(isOpen);
             });
-
+            
             document.querySelector('.main-content').addEventListener('click', () => {
                 if (document.body.classList.contains('nav-open')) {
                     document.body.classList.remove('nav-open');
-                    document.getElementById('side-nav').classList.remove('open');
+                    sideNav.classList.remove('open');
                     setMenuIcon(false);
                 }
             });
 
-            log("Orion Controller iniciado. Introduce la IP de N.I.N.A para conectar.");
+            document.querySelectorAll('.control-btn, .nav-btn').forEach(button => {
+                button.addEventListener("click", createParticleBurst);
+            });
+
+            setStatus('disconnected', 'Desconectado');
+            log("Orion Controller iniciado. Introduce la URL de N.I.N.A para conectar.");
+
+            // --- Full Panel Implementations ---
+            window.populateGuidingPanel = function() {
+                populatePanel('guiding-modal-body', async () => `
+                    <div class="modal-grid">
+                        <div class="control-group">
+                            <h3>Estado del Guiado</h3>
+                            <div id="guiding-stats-grid" class="stat-grid">Cargando...</div>
+                        </div>
+                        <div class="control-group">
+                            <h3>Controles</h3>
+                            <div class="btn-grid">
+                                <button class="control-btn" onclick="callNinaApi('/equipment/guider/start')">Iniciar Guiado</button>
+                                <button class="control-btn" onclick="callNinaApi('/equipment/guider/stop')">Detener Guiado</button>
+                                <button class="control-btn" onclick="callNinaApi('/equipment/guider/start?dither=true')">Dither</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="control-group" style="margin-top: 1.5rem;">
+                        <h3>Gráfica de Guiado (RMS Total)</h3>
+                        <div class="chart-container"><canvas id="guiderChart"></canvas></div>
+                    </div>
+                `).then(() => createChart('guiderChart', 'guiderRMS', 'RMS (")', chartData.guiderRMS, 'var(--cyan)'));
+            };
+            
+            window.populateCameraPanel = function() {
+                 populatePanel('camera-modal-body', async () => `
+                    <div class="modal-grid" style="grid-template-columns: 1fr 2fr; align-items: flex-start;">
+                        <div>
+                            <div class="control-group">
+                                <h3>Estado de la Cámara</h3>
+                                 <div id="camera-stats-grid" class="stat-grid">Cargando...</div>
+                            </div>
+                            <div class="control-group" style="margin-top:1.5rem">
+                                <h3>Control de Exposición</h3>
+                                <div class="btn-grid">
+                                    <input type="number" id="exp-time" placeholder="Tiempo (s)" value="5">
+                                    <input type="number" id="exp-binning" placeholder="Binning" value="1">
+                                    <button class="control-btn" onclick="callNinaApi('/equipment/camera/capture?exposure=' + document.getElementById('exp-time').value + '&binning=' + document.getElementById('exp-binning').value)">Tomar Foto</button>
+                                    <button class="control-btn" style="--glow-color: var(--error);" onclick="callNinaApi('/equipment/camera/abort-exposure')">Abortar</button>
+                                </div>
+                            </div>
+                             <div class="control-group" style="margin-top:1.5rem">
+                                <h3>Control del Cooler</h3>
+                                <div class="btn-grid">
+                                   <input type="number" id="cooler-setpoint" placeholder="Temp. Objetivo (°C)" value="-10">
+                                   <button class="control-btn" onclick="callNinaApi('/equipment/camera/cool?setpoint=' + document.getElementById('cooler-setpoint').value)">Enfriar</button>
+                                   <button class="control-btn" onclick="callNinaApi('/equipment/camera/warm')">Calentar</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="control-group">
+                                <h3>Última Captura</h3>
+                                <div class="image-viewer">
+                                    <img id="latest-capture-img" src="https://placehold.co/600x400/0a0a0f/333?text=Sin+Imagen" alt="Última captura">
+                                    <button class="image-viewer-btn" id="fullscreen-btn">⛶</button>
+                                </div>
+                            </div>
+                            <div class="control-group" style="margin-top:1.5rem">
+                                <h3>Live Stacking</h3>
+                                <div class="image-viewer">
+                                    <img id="livestack-img" src="https://placehold.co/600x400/0a0a0f/333?text=Inactivo" alt="Apilado en vivo">
+                                </div>
+                                <div class="btn-grid" style="margin-top:1rem">
+                                    <button class="control-btn" onclick="callNinaApi('/livestack/start')">Iniciar Stack</button>
+                                    <button class="control-btn" onclick="callNinaApi('/livestack/stop')">Detener Stack</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-grid" style="margin-top: 1.5rem;">
+                        <div class="control-group">
+                             <h3>Gráfica de Temperatura</h3>
+                             <div class="chart-container"><canvas id="tempChart"></canvas></div>
+                        </div>
+                        <div class="control-group">
+                             <h3>Gráfica de SNR</h3>
+                             <div class="chart-container"><canvas id="snrChart"></canvas></div>
+                        </div>
+                    </div>
+                `).then(() => {
+                    document.getElementById('fullscreen-btn').onclick = () => {
+                        document.getElementById('fullscreen-image').src = document.getElementById('latest-capture-img').src;
+                        openModal('fullscreen');
+                    };
+                    createChart('tempChart', 'temp', 'Temperatura (°C)', chartData.temp, 'var(--blue)');
+                    createChart('snrChart', 'snr', 'SNR', chartData.snr, 'var(--ok)');
+                });
+            };
+            
+            window.populateSequencerPanel = function() {
+                 populatePanel('sequencer-modal-body', async () => {
+                    const state = await callNinaApi('/sequence/state', false);
+                    const progress = (state && state.Instructions.Total > 0) ? (state.Instructions.Current / state.Instructions.Total) * 100 : 0;
+                    return `
+                    <div class="modal-grid">
+                        <div class="control-group">
+                            <h3>Estado de la Secuencia</h3>
+                            <div id="sequencer-stats-grid" class="stat-grid">
+                                <strong>Estado:</strong> <span>${state?.State || 'Inactivo'}</span>
+                                <strong>Objetivo:</strong> <span>${state?.Target?.Name || 'Ninguno'}</span>
+                                <strong>Progreso:</strong> 
+                                <div>
+                                    <span>${state?.Instructions?.Current || 0} / ${state?.Instructions?.Total || 0}</span>
+                                    <div class="progress-bar"><div class="progress-bar-inner" style="width: ${progress.toFixed(2)}%;"></div></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="control-group">
+                            <h3>Controles de Secuencia</h3>
+                            <div class="btn-grid">
+                                <button class="control-btn" onclick="callNinaApi('/sequence/start')">Iniciar Secuencia</button>
+                                <button class="control-btn" onclick="callNinaApi('/sequence/stop')">Detener Secuencia</button>
+                            </div>
+                        </div>
+                    </div>`;
+                });
+            };
+            
+            // --- Charting ---
+            window.addChartData = function(history, value) {
+                if (!isFinite(value) || value === null) return;
+                history.push({x: Date.now(), y: value});
+                if(history.length > MAX_HISTORY) history.shift();
+            }
+
+            window.createChart = function(ctxId, dataKey, label, data, color) {
+                const ctx = document.getElementById(ctxId)?.getContext('2d');
+                if (!ctx) return;
+                if (charts[dataKey]) { charts[dataKey].destroy(); }
+
+                charts[dataKey] = new Chart(ctx, {
+                    type: 'line',
+                    data: { datasets: [{
+                        label: label, data: data,
+                        borderColor: color, backgroundColor: `${color}33`,
+                        borderWidth: 2, pointRadius: 1, tension: 0.4, fill: true
+                    }]},
+                    options: {
+                        scales: {
+                            x: { type: 'time', time: { unit: 'minute', displayFormats: { minute: 'HH:mm' } }, grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: 'var(--text-secondary)'} },
+                            y: { beginAtZero: false, grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: 'var(--text-secondary)'} }
+                        },
+                        plugins: { legend: { display: false } },
+                        maintainAspectRatio: false,
+                        responsive: true
+                    }
+                });
+            };
+
+            // --- Full data update loop ---
+            const fullUpdateLoop = async () => {
+                if(!isConnected) return;
+                
+                const openModalId = document.querySelector('.modal[style*="display: flex"]')?.id;
+                if (!openModalId) return;
+
+                if (openModalId === 'camera-modal') {
+                    const info = await callNinaApi('/equipment/camera/info', false);
+                    if(info) {
+                        document.querySelector('#camera-stats-grid').innerHTML = `
+                            <strong>Temperatura:</strong> <span>${typeof info.Temperature === 'number' ? info.Temperature.toFixed(1) : '--'} &deg;C</span>
+                            <strong>Potencia Cooler:</strong> <span>${typeof info.CoolerPower === 'number' ? info.CoolerPower.toFixed(0) : '--'} %</span>
+                            <strong>Última Exposición:</strong> <span>${info.LastExposureDuration || '--'} s</span>
+                            <strong>Filtro Actual:</strong> <span>${info.Filter || '--'}</span>`;
+                        addChartData(chartData.temp, info.Temperature);
+                        addChartData(chartData.snr, info.LastExposureSNR);
+                        if(charts.temp) charts.temp.update('none');
+                        if(charts.snr) charts.snr.update('none');
+                    }
+                    try {
+                        const latestImg = await callNinaApi('/image/parameter?format=jpg&quality=80&stream=false', false);
+                        if(latestImg) document.getElementById('latest-capture-img').src = `data:image/jpeg;base64,${latestImg}`;
+                    } catch (e) { /* Gracefully fail if no image */ }
+
+                    try {
+                        const livestackImg = await callNinaApi('/livestack/parameter/jpg?quality=80&stream=false', false);
+                        if(livestackImg) document.getElementById('livestack-img').src = `data:image/jpeg;base64,${livestackImg}`;
+                    } catch (e) { 
+                        // It's normal to fail if stacking just started, so don't log error
+                    }
+                }
+
+                if (openModalId === 'guiding-modal') {
+                    const info = await callNinaApi('/equipment/guider/info', false);
+                    if(info) {
+                        document.querySelector('#guiding-stats-grid').innerHTML = `
+                            <strong>Estado:</strong> <span>${info.State || '--'}</span>
+                            <strong>RMS Total:</strong> <span>${typeof info.RMSTotal === 'number' ? info.RMSTotal.toFixed(2) : '--'}</span>
+                            <strong>RMS RA:</strong> <span>${typeof info.RMSRA === 'number' ? info.RMSRA.toFixed(2) : '--'}</span>
+                            <strong>RMS DEC:</strong> <span>${typeof info.RMSDEC === 'number' ? info.RMSDEC.toFixed(2) : '--'}</span>
+                            <strong>SNR:</strong> <span>${typeof info.SNR === 'number' ? info.SNR.toFixed(1) : '--'}</span>`;
+                        addChartData(chartData.guiderRMS, info.RMSTotal);
+                        if(charts.guiderRMS) charts.guiderRMS.update('none');
+                    }
+                }
+                
+                if (openModalId === 'mount-modal') {
+                    const info = await callNinaApi('/equipment/mount/info', false);
+                     if(info) {
+                        document.querySelector('#mount-stats-grid').innerHTML = `
+                            <strong>Estado:</strong> <span>${info.State || '--'}</span>
+                            <strong>AR/DEC:</strong> <span>${typeof info.RightAscension === 'number' ? info.RightAscension.toFixed(2) : '--'} / ${typeof info.Declination === 'number' ? info.Declination.toFixed(2) : '--'}</span>
+                            <strong>Alt/Az:</strong> <span>${typeof info.Altitude === 'number' ? info.Altitude.toFixed(2) : '--'} / ${typeof info.Azimuth === 'number' ? info.Azimuth.toFixed(2) : '--'}</span>
+                            <strong>Lado del Pier:</strong> <span>${info.SideOfPier || '--'}</span>`;
+                    }
+                }
+                
+                 if (openModalId === 'sequencer-modal') {
+                    const state = await callNinaApi('/sequence/state', false);
+                    if(state) {
+                        const progress = (state.Instructions.Total > 0) ? (state.Instructions.Current / state.Instructions.Total) * 100 : 0;
+                        document.querySelector('#sequencer-stats-grid').innerHTML = `
+                            <strong>Estado:</strong> <span>${state.State || 'Inactivo'}</span>
+                            <strong>Objetivo:</strong> <span>${state.Target?.Name || 'Ninguno'}</span>
+                            <strong>Progreso:</strong> 
+                            <div>
+                                <span>${state.Instructions.Current || 0} / ${state.Instructions.Total || 0}</span>
+                                <div class="progress-bar"><div class="progress-bar-inner" style="width: ${progress.toFixed(2)}%;"></div></div>
+                            </div>`;
+                    }
+                }
+            };
+            
+            setInterval(fullUpdateLoop, 3000); 
         });
     </script>
 </body>
