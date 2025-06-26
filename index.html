@@ -178,6 +178,7 @@
         .ping-bar:nth-child(3) { height: 75%; } .ping-bar:nth-child(4) { height: 100%; }
         #weather-map { width: 100%; height: 300px; border-radius: 12px; border: 1px solid var(--border); background-color: #1a1a1a; }
         .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.9); }
+        .leaflet-tile-pane.clouds { filter: brightness(1.5) contrast(1.5) sepia(1) hue-rotate(-180deg); }
         .forecast-container { display: flex; gap: 1rem; overflow-x: auto; padding-bottom: 1rem; }
         .forecast-card { flex: 0 0 100px; text-align: center; background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 12px; }
 
@@ -499,7 +500,8 @@
                                 attribution: '&copy; OpenStreetMap &copy; CARTO',
                             }).addTo(map);
                             L.tileLayer(`https://tile.openweathermap.org/map/clouds_new/{z}/{x}/{y}.png?appid=${WEATHER_API_KEY}`, {
-                                opacity: 0.7
+                                opacity: 0.7,
+                                className: 'clouds'
                             }).addTo(map);
                             L.marker([latitude, longitude]).addTo(map);
                          }
